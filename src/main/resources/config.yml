@@ -3,8 +3,8 @@
 # placeholders in a string are written as {placeholder}
 
 settings:
-  # <name> = armor stand's name, <prefix> = same prefix used in chat (messages.prefix)
-  gui-title: "<prefix><name>"
+  # <name> and <prefix> tags are available here (prefix = messages.prefix below)
+  gui-title: "Editor"
   # used in the menu title when the armor stand has no custom name
   default-armorstand-name: "Armor Stand"
   # max distance (blocks) the player can move away from the stand while free-editing
@@ -60,15 +60,17 @@ messages:
 items:
   toggle-active:
     material: GREEN_DYE
-    name: "<gradient:#56ab2f:#a8e063>active</gradient>"
+    name: "<gradient:#56ab2f:#a8e063><bold>ACTIVE</bold></gradient>"
     lore:
       - "<gray>Click to toggle</gray>"
+    glint: true
 
   toggle-inactive:
     material: RED_DYE
-    name: "<gradient:#eb3349:#f45c43>inactive</gradient>"
+    name: "<gradient:#eb3349:#f45c43><bold>INACTIVE</bold></gradient>"
     lore:
       - "<gray>Click to toggle</gray>"
+    glint: false
 
   baseplate:
     material: STONE_PRESSURE_PLATE
@@ -95,10 +97,11 @@ items:
       - "<gray>Toggles gravity</gray>"
 
   invisible:
-    material: POTION
+    material: SPLASH_POTION
     name: "<gradient:#f7971e:#ffd200><bold>Invisible</bold></gradient>"
     lore:
       - "<gray>Toggles visibility</gray>"
+    glint: true
 
   name-visible:
     material: NAME_TAG
@@ -108,25 +111,25 @@ items:
       - "<gray>using a name tag</gray>"
 
   helmet:
-    material: LEATHER_HELMET
+    material: CHAINMAIL_HELMET
     name: "<gradient:#f7971e:#ffd200><bold>Helmet</bold></gradient>"
     lore:
       - "<gray>Drag an item here</gray>"
 
   chestplate:
-    material: LEATHER_CHESTPLATE
+    material: CHAINMAIL_CHESTPLATE
     name: "<gradient:#f7971e:#ffd200><bold>Chestplate</bold></gradient>"
     lore:
       - "<gray>Drag an item here</gray>"
 
   leggings:
-    material: LEATHER_LEGGINGS
+    material: CHAINMAIL_LEGGINGS
     name: "<gradient:#f7971e:#ffd200><bold>Leggings</bold></gradient>"
     lore:
       - "<gray>Drag an item here</gray>"
 
   boots:
-    material: LEATHER_BOOTS
+    material: CHAINMAIL_BOOTS
     name: "<gradient:#f7971e:#ffd200><bold>Boots</bold></gradient>"
     lore:
       - "<gray>Drag an item here</gray>"
@@ -181,33 +184,38 @@ items:
 
   position:
     material: IRON_LEGGINGS
-    name: ""
+    name: "<gradient:#f7971e:#ffd200><bold>Position</bold></gradient>"
     lore:
       - "<gray>Click to edit</gray>"
+      - "<dark_gray>(Same as below)</dark_gray>"
 
   position-boots:
     material: IRON_BOOTS
     name: "<gradient:#f7971e:#ffd200><bold>Position</bold></gradient>"
     lore:
       - "<gray>Click to edit</gray>"
+      - "<dark_gray>(Same as above)</dark_gray>"
 
   size:
-    material: PUFFERFISH
+    material: ARMOR_STAND
     name: "<gradient:#f7971e:#ffd200><bold>Size</bold></gradient>"
     lore:
       - "<gray>Click to edit</gray>"
+    glint: true
 
   back-button:
-    material: MAGENTA_DYE
+    material: BARRIER
     name: "<gradient:#c471ed:#f64f59>Back</gradient>"
     lore:
       - "<gray>Return to the main menu</gray>"
+    glint: true
 
   free-edit-button:
     material: CYAN_DYE
     name: "<gradient:#43cea2:#185a9d>Free Edit</gradient>"
     lore:
       - "<gray>Edit by moving around</gray>"
+    glint: true
 
   value-display:
     material: YELLOW_DYE
