@@ -2,8 +2,8 @@ plugins {
     id 'java'
 }
 
-group = 'de.iani'
-version = '1.0.7'
+group = 'de.iani.cubeside'
+version = '1.0.0'
 
 def buildNumber = project.findProperty('buildNumber') ?: 'DEV'
 

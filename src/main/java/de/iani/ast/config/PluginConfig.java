@@ -23,9 +23,13 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
+// loads config.yml and turns its entries into components/itemstacks, so the plugin
+// can be re-themed by editing the config instead of the code
 public class PluginConfig {
 
-    private static final NamespacedKey HIDE_ARMOR_TOOLTIP_KEY = NamespacedKey.fromString("ArmorStandTools:justhide");
+    // used for zero-effect attribute modifiers on menu items, just so there's something
+    // for hideDefaultTooltipStats() to hide
+    private static final NamespacedKey HIDE_ARMOR_TOOLTIP_KEY = NamespacedKey.fromString("armorstandtools:justhide");
 
     private final JavaPlugin plugin;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
@@ -42,9 +46,7 @@ public class PluginConfig {
         this.config = plugin.getConfig();
     }
 
-    // ---------------------------------------------------------------
     // settings.*
-    // ---------------------------------------------------------------
 
     public String getDefaultArmorStandName() {
         return config.getString("settings.default-armorstand-name", "Armor Stand");
@@ -66,6 +68,8 @@ public class PluginConfig {
         return config.getInt("settings.free-edit-timeout-ticks", 5);
     }
 
+    // builds the inventory title from settings.gui-title, a MiniMessage string with
+    // <name> and <prefix> tags that insert already-built components
     public Component guiTitle(Component armorStandName) {
         String template = config.getString("settings.gui-title", "<name> Editor");
         TagResolver resolver = TagResolver.builder()
@@ -75,9 +79,7 @@ public class PluginConfig {
         return miniMessage.deserialize(template, resolver);
     }
 
-    // ---------------------------------------------------------------
     // messages.*
-    // ---------------------------------------------------------------
 
     private String rawMessage(String key) {
         String value = config.getString("messages." + key);
@@ -102,6 +104,8 @@ public class PluginConfig {
         return render(rawMessage(key), placeholders);
     }
 
+    // like message(), but embeds an already-built component via a tag, e.g.
+    // "Baseplate is now <status>" with placeholderTag "status"
     public Component messageWithComponent(String key, String placeholderTag, Component value) {
         TagResolver resolver = TagResolver.resolver(placeholderTag, Tag.inserting(value));
         return miniMessage.deserialize(rawMessage(key), resolver).decoration(TextDecoration.ITALIC, false);
@@ -127,9 +131,8 @@ public class PluginConfig {
         if (message.color() != null) {
             return message;
         }
-        // these three settings are a plain color name (like "gold") or hex
-        // code ("#AABBCC") rather than a full minimessage tag, since
-        // they only ever colorize an already built component
+        // plain color name ("gold") or hex code ("#AABBCC"), not a MiniMessage tag,
+        // since this only colorizes an already-built component
         String colorValue = rawMessage(colorKey);
         TextColor color = NamedTextColor.NAMES.value(colorValue.toLowerCase(Locale.ROOT));
         if (color == null) {
@@ -141,6 +144,8 @@ public class PluginConfig {
     public Component activation(boolean active) {
         return message(active ? "active" : "inactive");
     }
+
+    // items.*
 
     private ConfigurationSection itemSection(String key) {
         return config.getConfigurationSection("items." + key);
@@ -189,6 +194,11 @@ public class PluginConfig {
         }
     }
 
+    // hides minecraft's default tooltip lines ("+2 armor", attack damage, etc.) on every
+    // menu item. these items are never actually worn/wielded, so slapping harmless
+    // zero-effect modifiers on everything is fine even where they don't apply.
+    // an item needs at least one modifier for HIDE_ATTRIBUTES to have something to hide,
+    // which is why the zero modifiers get added first
     private void hideDefaultTooltipStats(ItemMeta meta) {
         meta.addAttributeModifier(Attribute.ARMOR, new AttributeModifier(HIDE_ARMOR_TOOLTIP_KEY, 0, Operation.ADD_SCALAR));
         meta.addAttributeModifier(Attribute.ARMOR_TOUGHNESS, new AttributeModifier(HIDE_ARMOR_TOOLTIP_KEY, 0, Operation.ADD_SCALAR));
@@ -198,6 +208,7 @@ public class PluginConfig {
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_DYE);
     }
 
+    // builds a menu item with material/name/lore all read from config.yml for this key
     public ItemStack buildItem(String key, Material fallbackMaterial) {
         ItemStack stack = new ItemStack(getItemMaterial(key, fallbackMaterial));
         ItemMeta meta = stack.getItemMeta();
@@ -212,6 +223,8 @@ public class PluginConfig {
         return stack;
     }
 
+    // like buildItem(), but the name is computed at runtime (e.g. "x = 12.3°").
+    // any extra lore passed in is shown before the static lore from config
     public ItemStack buildDynamicItem(String key, Material fallbackMaterial, Component name, Component... lore) {
         ItemStack stack = new ItemStack(getItemMaterial(key, fallbackMaterial));
         ItemMeta meta = stack.getItemMeta();

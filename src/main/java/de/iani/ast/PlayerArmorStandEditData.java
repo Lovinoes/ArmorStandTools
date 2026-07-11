@@ -19,6 +19,9 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.EulerAngle;
 
+// one editing session for one player + armor stand. handles both the main
+// window (toggles/equipment) and the rotation window (+/- delta buttons),
+// which share the same 6x9 inventory and reuse slot numbers between views
 public class PlayerArmorStandEditData {
 
     public static enum EditState {
@@ -38,10 +41,7 @@ public class PlayerArmorStandEditData {
         Size
     }
 
-    // ---------------------------------------------------------------
-    // General window layout
-    // ---------------------------------------------------------------
-
+    // main window slots, used both when building the window and when reading clicks back
     private static final int SLOT_BASEPLATE_TOGGLE = 9 * 0 + 1;
     private static final int SLOT_ARMS_TOGGLE = 9 * 1 + 1;
     private static final int SLOT_SMALL_TOGGLE = 9 * 2 + 1;
@@ -55,13 +55,16 @@ public class PlayerArmorStandEditData {
     private static final int SLOT_LEFT_ARM_ROTATION_OPEN = 9 * 2 + 3;
     private static final int SLOT_RIGHT_ARM_ROTATION_OPEN = 9 * 2 + 5;
     private static final int SLOT_POSITION_OPEN = 9 * 3 + 4;
-
+    // second way to open the position editor, between the leg-rotation buttons
     private static final int SLOT_POSITION_BOOTS_OPEN = 9 * 4 + 4;
     private static final int SLOT_LEFT_LEG_ROTATION_OPEN = 9 * 4 + 3;
     private static final int SLOT_RIGHT_LEG_ROTATION_OPEN = 9 * 4 + 5;
 
+    // back button in the rotation window, returns to the main window
     private static final int SLOT_ROTATION_BACK = 9 * 5;
 
+    // one row per equipment slot; column 7 is the label icon, column 8 mirrors the actual item.
+    // order has to match the icon rows built in editGeneral()
     private static final EquipmentSlot[] EQUIPMENT_BY_ROW = {
             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.OFF_HAND, EquipmentSlot.HAND
     };
@@ -116,9 +119,7 @@ public class PlayerArmorStandEditData {
         return freeMoveStartTick;
     }
 
-    // =================================================================
-    // General window
-    // =================================================================
+    // main window
 
     private void editGeneral() {
         this.editState = EditState.MainWindow;
@@ -165,6 +166,7 @@ public class PlayerArmorStandEditData {
         }
     }
 
+    // mutates the armor stand, refreshes the icon, then tells the player what changed
     private void toggle(Runnable mutate, BooleanSupplier activeAfter, Runnable updateIcon, String messageKey) {
         mutate.run();
         Messages.send(owner, config.messageWithComponent(messageKey, "status", Messages.activation(activeAfter.getAsBoolean())));
@@ -195,6 +197,7 @@ public class PlayerArmorStandEditData {
         toggle(() -> armorStand.setSmall(!armorStand.isSmall()), armorStand::isSmall, this::updateIsSmall, "small-toggled");
     }
 
+    // "unmoveable" just means no gravity
     private void updateIsUnmoveable() {
         setStatusIcon(SLOT_UNMOVEABLE_TOGGLE, !armorStand.hasGravity());
     }
@@ -203,6 +206,7 @@ public class PlayerArmorStandEditData {
         toggle(() -> armorStand.setGravity(!armorStand.hasGravity()), () -> !armorStand.hasGravity(), this::updateIsUnmoveable, "unmoveable-toggled");
     }
 
+    // "invisible" is just isVisible() being false
     private void updateIsInvisible() {
         setStatusIcon(SLOT_INVISIBLE_TOGGLE, !armorStand.isVisible());
     }
@@ -219,6 +223,7 @@ public class PlayerArmorStandEditData {
         toggle(() -> armorStand.setCustomNameVisible(!armorStand.isCustomNameVisible()), armorStand::isCustomNameVisible, this::updateNameIsVisible, "name-visible-toggled");
     }
 
+    // mirrors the armor stand's equipped items into column 8 of each row
     private void updateArmorstandInventory() {
         if (editState == EditState.MainWindow) {
             for (int row = 0; row < EQUIPMENT_BY_ROW.length; row++) {
@@ -227,16 +232,16 @@ public class PlayerArmorStandEditData {
         }
     }
 
+    // same but a tick later, so a just-placed item actually shows up
     private void updateArmorstandInventoryLater() {
         if (editState == EditState.MainWindow) {
             plugin.getServer().getScheduler().runTask(plugin, this::updateArmorstandInventory);
         }
     }
 
-    // =================================================================
-    // Rotation window
-    // =================================================================
+    // rotation window
 
+    // refreshes the value-display items for whatever part is currently being edited
     private void updateRotationInventory() {
         double x = 0;
         double y = 0;
@@ -303,6 +308,7 @@ public class PlayerArmorStandEditData {
         }
     }
 
+    // clears the inventory and builds the +/- buttons for editing this part
     private void openRotationMenu(RotatablePart part) {
         editState = EditState.RotationWindow;
         rotationToEdit = part;
@@ -329,6 +335,7 @@ public class PlayerArmorStandEditData {
         updateRotationInventory();
     }
 
+    // position/size row: +/- 1, 0.1, 0.01, shift-click for three decimals finer
     private void setPositionRowItems(int row) {
         armorStandInventory.setItem(9 * row + 0, deltaButton(false, "-1.0", "-0.001"));
         armorStandInventory.setItem(9 * row + 1, deltaButton(false, "-0.1", "-0.0001"));
@@ -339,6 +346,7 @@ public class PlayerArmorStandEditData {
         armorStandInventory.setItem(9 * row + 8, config.buildItem("free-edit-button", Material.CYAN_DYE));
     }
 
+    // rotation row: +/- 90, 10, 1 degree buttons
     private void setRotationRowItems(int row) {
         armorStandInventory.setItem(9 * row + 0, deltaButton(false, "-90.0°", "-0.1°"));
         armorStandInventory.setItem(9 * row + 1, deltaButton(false, "-10.0°", "-0.01°"));
@@ -365,9 +373,7 @@ public class PlayerArmorStandEditData {
         return rad * (180.0 / Math.PI);
     }
 
-    // =================================================================
-    // Click / drag routing
-    // =================================================================
+    // click / drag routing
 
     private void handleModificationSlotClick(int slot, boolean shift) {
         if (editState == EditState.MainWindow) {
@@ -442,6 +448,7 @@ public class PlayerArmorStandEditData {
         }
     }
 
+    // how much a single click on this delta-button column changes the value by
     private double deltaForSlot(int slotInRow, boolean isDegreeRow, boolean shift) {
         double delta;
         if (slotInRow == 0) {
@@ -451,7 +458,7 @@ public class PlayerArmorStandEditData {
         } else if (slotInRow == 2) {
             delta = !isDegreeRow ? -0.01 : degreeToRad(-1);
         } else if (slotInRow == 3) {
-
+            // clicking the value display itself resets the axis to 0, NaN is the reset sentinel
             delta = Double.NaN;
         } else if (slotInRow == 4) {
             delta = !isDegreeRow ? 0.01 : degreeToRad(1);
@@ -537,6 +544,9 @@ public class PlayerArmorStandEditData {
         }
     }
 
+    // equips the item onto the armor stand, but only if the slot still shows what the
+    // armor stand actually has equipped (otherwise something changed it in the meantime,
+    // so refuse and let the caller cancel/refresh instead)
     private boolean placeItemInSlot(int slot, ItemStack newInSlot) {
         updateArmorstandInventoryLater();
         int row = slot / 9;
@@ -569,6 +579,8 @@ public class PlayerArmorStandEditData {
         }
     }
 
+    // applies a delta to axis 0=x, 1=y, 2=z, 3=yaw of whatever part is being edited,
+    // sends chat feedback unless we're in free-edit (that would spam every tick)
     private void applyRotationDelta(int axis, double diff) {
         NumberFormat format = NumberFormat.getNumberInstance();
         format.setMaximumFractionDigits(5);
@@ -593,7 +605,7 @@ public class PlayerArmorStandEditData {
                 if (value < 1f / 16f) {
                     value = 1f / 16f;
                 }
-                double max = owner.hasPermission("ArmorStandTools.unlimitedsize") ? config.getUnlimitedSizeLimit() : config.getDefaultSizeLimit();
+                double max = owner.hasPermission("armorstandtools.unlimitedsize") ? config.getUnlimitedSizeLimit() : config.getDefaultSizeLimit();
                 if (value > max) {
                     value = max;
                 }

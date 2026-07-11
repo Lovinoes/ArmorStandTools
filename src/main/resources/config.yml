@@ -1,31 +1,24 @@
-# ArmorStandTools configuration
-# All text supports MiniMessage formatting: https://docs.advntr.dev/minimessage/format.html
-# Placeholders inside a string are written as {placeholder}.
+# armorstandtools config
+# text supports minimessage formatting: https://docs.advntr.dev/minimessage/format.html
+# placeholders in a string are written as {placeholder}
 
 settings:
-  # The full inventory title, editable like normal text. Two tags are available:
-  #   <name>   - the armor stand's name (its custom name if it has one, otherwise
-  #              default-armorstand-name below)
-  #   <prefix> - the same prefix used in chat messages (messages.prefix above)
-  # These are tags (angle brackets), not {curly-brace} placeholders, because they
-  # insert an already-styled component (colors/gradient and all) rather than plain text.
+  # <name> = armor stand's name, <prefix> = same prefix used in chat (messages.prefix)
   gui-title: "<prefix><name>"
-  # Name used in the menu title (via <name>) when the armor stand has no custom name
+  # used in the menu title when the armor stand has no custom name
   default-armorstand-name: "Armor Stand"
-  # Maximum distance (in blocks) the player may move away from the armor stand while free-editing
+  # max distance (blocks) the player can move away from the stand while free-editing
   max-free-edit-distance: 15
-  # Maximum scale value for players without the ArmorStandTools.unlimitedsize permission
+  # max scale without the armorstandtools.unlimitedsize permission
   default-size-limit: 4
-  # Maximum scale value for players with the ArmorStandTools.unlimitedsize permission
+  # max scale with the armorstandtools.unlimitedsize permission
   unlimited-size-limit: 16
-  # Ticks of "grace period" after closing free-edit mode before interactions are cancelled again
+  # grace period (ticks) after closing free-edit before interactions get cancelled again
   free-edit-timeout-ticks: 5
 
 messages:
   prefix: "<gradient:#00c6ff:#0072ff><bold>[Editor]</bold></gradient> "
-  # These three are a plain color name (e.g. "gold") or hex code (e.g. "#AABBCC"),
-  # not a MiniMessage tag, since they only colorize text that has no color of its own yet.
-  # Gradients aren't possible here (a single flat TextColor is applied), so pick a solid accent instead.
+  # plain color name or hex code, not a minimessage tag - only colors text with no color yet
   default-color: "#FFD166"
   success-color: "#06D6A0"
   error-color: "#EF476F"
@@ -48,29 +41,22 @@ messages:
 
   no-build-permission: "No build permission!"
 
-  # {axis} = x/X, y/Y, z/Z (caller decides the casing, same as the original plugin),
-  # {value} = formatted number, {unit} = "°" for rotations, "" for positions
+  # {axis} = x/X, y/Y, z/Z, {value} = formatted number, {unit} = "°" or ""
   format-axis: "{axis} = {value}{unit}"
-  # {label} = "yaw" (menu item) or "Yaw" (chat feedback), {value} = formatted number
+  # {label} = "yaw" or "Yaw", {value} = formatted number
   format-yaw: "{label} = {value}°"
-  # Shown on the size menu item
   format-scale-item: "Size = {value}"
-  # Sent as chat feedback while resizing (kept distinct from the item label, matching upstream)
   format-scale-chat: "Scale = {value}"
 
-  # Lore shown on the value-display items, telling the player what a click resets it to
+  # lore on the value-display items, telling the player what a click resets it to
   lore-reset-zero: "Click to set to 0."
   lore-reset-one: "Click to set to 1."
 
-  # Lore template for the +/- rotation & position/size delta buttons, {value} includes its own unit/sign
+  # {value} includes its own unit/sign
   format-shift-lore: "Shift+Click: {value}"
 
-# Each entry under items: can have:
-#   material - a valid Bukkit Material name
-#   name     - MiniMessage text
-#   lore     - a list of MiniMessage lines (optional)
-#   glint    - true/false (optional, default false) - makes the item glow like an
-#              enchanted one, without adding a real (visible-in-tooltip) enchantment
+# each entry under items: can have material (bukkit material name), name/lore (minimessage),
+# and glint (true/false, makes it glow without a real enchantment)
 items:
   toggle-active:
     material: GREEN_DYE
