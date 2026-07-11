@@ -30,7 +30,7 @@ tasks.named('compileJava', JavaCompile) {
 }
 
 tasks.named('jar', Jar) {
-    archiveFileName.set('ArmorStandTools-${version}.jar')
+    archiveFileName.set('ArmorStandTools.jar')
 }
 
 tasks.named('processResources', ProcessResources) {
