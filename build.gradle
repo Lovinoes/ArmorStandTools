@@ -1,0 +1,42 @@
+plugins {
+    id 'java'
+}
+
+group = 'de.iani'
+version = '1.0.7'
+
+def buildNumber = project.findProperty('buildNumber') ?: 'DEV'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://repo.papermc.io/repository/maven-public/' }
+    maven { url 'https://maven.enginehub.org/repo/' }
+}
+
+dependencies {
+    compileOnly 'io.papermc.paper:paper-api:[26.1.2.build,)'
+    compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.10-SNAPSHOT'
+}
+
+tasks.named('compileJava', JavaCompile) {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('jar', Jar) {
+    archiveFileName.set('ArmorStandTools-${version}.jar')
+}
+
+tasks.named('processResources', ProcessResources) {
+    filteringCharset = 'UTF-8'
+    def props = [version: version, buildNumber: buildNumber]
+    filesMatching('plugin.yml') {
+        expand(props)
+    }
+}

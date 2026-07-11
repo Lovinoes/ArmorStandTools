@@ -1,0 +1,233 @@
+# ArmorStandTools configuration
+# All text supports MiniMessage formatting: https://docs.advntr.dev/minimessage/format.html
+# Placeholders inside a string are written as {placeholder}.
+
+settings:
+  # The full inventory title, editable like normal text. Two tags are available:
+  #   <name>   - the armor stand's name (its custom name if it has one, otherwise
+  #              default-armorstand-name below)
+  #   <prefix> - the same prefix used in chat messages (messages.prefix above)
+  # These are tags (angle brackets), not {curly-brace} placeholders, because they
+  # insert an already-styled component (colors/gradient and all) rather than plain text.
+  gui-title: "<prefix><name>"
+  # Name used in the menu title (via <name>) when the armor stand has no custom name
+  default-armorstand-name: "Armor Stand"
+  # Maximum distance (in blocks) the player may move away from the armor stand while free-editing
+  max-free-edit-distance: 15
+  # Maximum scale value for players without the ArmorStandTools.unlimitedsize permission
+  default-size-limit: 4
+  # Maximum scale value for players with the ArmorStandTools.unlimitedsize permission
+  unlimited-size-limit: 16
+  # Ticks of "grace period" after closing free-edit mode before interactions are cancelled again
+  free-edit-timeout-ticks: 5
+
+messages:
+  prefix: "<gradient:#00c6ff:#0072ff><bold>[Editor]</bold></gradient> "
+  # These three are a plain color name (e.g. "gold") or hex code (e.g. "#AABBCC"),
+  # not a MiniMessage tag, since they only colorize text that has no color of its own yet.
+  # Gradients aren't possible here (a single flat TextColor is applied), so pick a solid accent instead.
+  default-color: "#FFD166"
+  success-color: "#06D6A0"
+  error-color: "#EF476F"
+
+  active: "<gradient:#56ab2f:#a8e063><bold>ACTIVE</bold></gradient>"
+  inactive: "<gradient:#eb3349:#f45c43><bold>INACTIVE</bold></gradient>"
+
+  baseplate-toggled: "Baseplate is now <status>"
+  arms-toggled: "Arms are now <status>"
+  small-toggled: "Small is now <status>"
+  unmoveable-toggled: "Immovable is now <status>"
+  invisible-toggled: "Invisible is now <status>"
+  name-visible-toggled: "Name visibility is now <status>"
+
+  free-edit-activated: "Free edit mode activated."
+  free-edit-instruction: "Move around to change the armor stand."
+  free-edit-confirm: "Left-click to confirm."
+  free-edit-cancelled: "Armor stand editing cancelled."
+  free-edit-ended: "Free edit mode ended."
+
+  no-build-permission: "No build permission!"
+
+  # {axis} = x/X, y/Y, z/Z (caller decides the casing, same as the original plugin),
+  # {value} = formatted number, {unit} = "°" for rotations, "" for positions
+  format-axis: "{axis} = {value}{unit}"
+  # {label} = "yaw" (menu item) or "Yaw" (chat feedback), {value} = formatted number
+  format-yaw: "{label} = {value}°"
+  # Shown on the size menu item
+  format-scale-item: "Size = {value}"
+  # Sent as chat feedback while resizing (kept distinct from the item label, matching upstream)
+  format-scale-chat: "Scale = {value}"
+
+  # Lore shown on the value-display items, telling the player what a click resets it to
+  lore-reset-zero: "Click to set to 0."
+  lore-reset-one: "Click to set to 1."
+
+  # Lore template for the +/- rotation & position/size delta buttons, {value} includes its own unit/sign
+  format-shift-lore: "Shift+Click: {value}"
+
+# Each entry under items: can have:
+#   material - a valid Bukkit Material name
+#   name     - MiniMessage text
+#   lore     - a list of MiniMessage lines (optional)
+#   glint    - true/false (optional, default false) - makes the item glow like an
+#              enchanted one, without adding a real (visible-in-tooltip) enchantment
+items:
+  toggle-active:
+    material: GREEN_DYE
+    name: "<gradient:#56ab2f:#a8e063>active</gradient>"
+    lore:
+      - "<gray>Click to toggle</gray>"
+
+  toggle-inactive:
+    material: RED_DYE
+    name: "<gradient:#eb3349:#f45c43>inactive</gradient>"
+    lore:
+      - "<gray>Click to toggle</gray>"
+
+  baseplate:
+    material: STONE_PRESSURE_PLATE
+    name: "<gradient:#f7971e:#ffd200><bold>Baseplate</bold></gradient>"
+    lore:
+      - "<gray>Toggles the base plate</gray>"
+
+  arms:
+    material: STICK
+    name: "<gradient:#f7971e:#ffd200><bold>Arms</bold></gradient>"
+    lore:
+      - "<gray>Toggles visible arms</gray>"
+
+  small:
+    material: CLAY_BALL
+    name: "<gradient:#f7971e:#ffd200><bold>Small</bold></gradient>"
+    lore:
+      - "<gray>Toggles the small size</gray>"
+
+  unmoveable:
+    material: RAIL
+    name: "<gradient:#f7971e:#ffd200><bold>Immovable</bold></gradient>"
+    lore:
+      - "<gray>Toggles gravity</gray>"
+
+  invisible:
+    material: POTION
+    name: "<gradient:#f7971e:#ffd200><bold>Invisible</bold></gradient>"
+    lore:
+      - "<gray>Toggles visibility</gray>"
+
+  name-visible:
+    material: NAME_TAG
+    name: "<gradient:#f7971e:#ffd200><bold>Name Visible</bold></gradient>"
+    lore:
+      - "<gray>The name can be changed</gray>"
+      - "<gray>using a name tag</gray>"
+
+  helmet:
+    material: LEATHER_HELMET
+    name: "<gradient:#f7971e:#ffd200><bold>Helmet</bold></gradient>"
+    lore:
+      - "<gray>Drag an item here</gray>"
+
+  chestplate:
+    material: LEATHER_CHESTPLATE
+    name: "<gradient:#f7971e:#ffd200><bold>Chestplate</bold></gradient>"
+    lore:
+      - "<gray>Drag an item here</gray>"
+
+  leggings:
+    material: LEATHER_LEGGINGS
+    name: "<gradient:#f7971e:#ffd200><bold>Leggings</bold></gradient>"
+    lore:
+      - "<gray>Drag an item here</gray>"
+
+  boots:
+    material: LEATHER_BOOTS
+    name: "<gradient:#f7971e:#ffd200><bold>Boots</bold></gradient>"
+    lore:
+      - "<gray>Drag an item here</gray>"
+
+  left-hand:
+    material: STICK
+    name: "<gradient:#f7971e:#ffd200><bold>Left Hand</bold></gradient>"
+    lore:
+      - "<gray>Drag an item here</gray>"
+
+  right-hand:
+    material: STICK
+    name: "<gradient:#f7971e:#ffd200><bold>Right Hand</bold></gradient>"
+    lore:
+      - "<gray>Drag an item here</gray>"
+
+  head-rotation:
+    material: IRON_HELMET
+    name: "<gradient:#f7971e:#ffd200><bold>Head Rotation</bold></gradient>"
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  body-rotation:
+    material: IRON_CHESTPLATE
+    name: "<gradient:#f7971e:#ffd200><bold>Body Rotation</bold></gradient>"
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  left-arm-rotation:
+    material: STICK
+    name: "<gradient:#f7971e:#ffd200><bold>Left Arm Rotation</bold></gradient>"
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  right-arm-rotation:
+    material: STICK
+    name: "<gradient:#f7971e:#ffd200><bold>Right Arm Rotation</bold></gradient>"
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  left-leg-rotation:
+    material: STICK
+    name: "<gradient:#f7971e:#ffd200><bold>Left Leg Rotation</bold></gradient>"
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  right-leg-rotation:
+    material: STICK
+    name: "<gradient:#f7971e:#ffd200><bold>Right Leg Rotation</bold></gradient>"
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  position:
+    material: IRON_LEGGINGS
+    name: ""
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  position-boots:
+    material: IRON_BOOTS
+    name: "<gradient:#f7971e:#ffd200><bold>Position</bold></gradient>"
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  size:
+    material: PUFFERFISH
+    name: "<gradient:#f7971e:#ffd200><bold>Size</bold></gradient>"
+    lore:
+      - "<gray>Click to edit</gray>"
+
+  back-button:
+    material: MAGENTA_DYE
+    name: "<gradient:#c471ed:#f64f59>Back</gradient>"
+    lore:
+      - "<gray>Return to the main menu</gray>"
+
+  free-edit-button:
+    material: CYAN_DYE
+    name: "<gradient:#43cea2:#185a9d>Free Edit</gradient>"
+    lore:
+      - "<gray>Edit by moving around</gray>"
+
+  value-display:
+    material: YELLOW_DYE
+
+  delta-negative:
+    material: RED_DYE
+
+  delta-positive:
+    material: GREEN_DYE

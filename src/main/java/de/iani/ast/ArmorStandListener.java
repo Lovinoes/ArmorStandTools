@@ -150,8 +150,8 @@ public class ArmorStandListener implements Listener {
             return false;
 
         }
-        if (plugin.getServer().getCurrentTick() - data.getFreeMoveStartTick() > 5) {
-            Messages.send(player, "Freie Modifikation beendet.");
+        if (plugin.getServer().getCurrentTick() - data.getFreeMoveStartTick() > plugin.getPluginConfig().getFreeEditTimeoutTicks()) {
+            Messages.send(player, plugin.getPluginConfig().message("free-edit-ended"));
             plugin.stopEditing(player, true);
         }
         return true;

@@ -1,16 +1,23 @@
 package de.iani.ast;
 
+import de.iani.ast.config.PluginConfig;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.CommandSender;
 
 public class Messages {
+
+    private static PluginConfig config;
+
     private Messages() {
         throw new RuntimeException();
     }
 
+    public static void init(PluginConfig pluginConfig) {
+        config = pluginConfig;
+    }
+
     public static Component activation(boolean b) {
-        return b ? Component.text("AKTIV", NamedTextColor.GREEN) : Component.text("INAKTIV", NamedTextColor.RED);
+        return config.activation(b);
     }
 
     public static void sendSuccess(CommandSender target, String message) {
@@ -18,12 +25,8 @@ public class Messages {
     }
 
     public static void sendSuccess(CommandSender target, Component message) {
-        message = message.color(NamedTextColor.GREEN);
+        message = config.successColor(message);
         send(target, message);
-    }
-
-    public static void sendPart(CommandSender target, String message, Component part) {
-        send(target, Component.text(message).append(part));
     }
 
     public static void sendError(CommandSender target, String message) {
@@ -31,7 +34,7 @@ public class Messages {
     }
 
     public static void sendError(CommandSender target, Component message) {
-        message = message.color(NamedTextColor.DARK_RED);
+        message = config.errorColor(message);
         send(target, message);
     }
 
@@ -40,9 +43,7 @@ public class Messages {
     }
 
     public static void send(CommandSender target, Component message) {
-        if (message.color() == null) {
-            message = message.color(NamedTextColor.GOLD);
-        }
-        target.sendMessage(Component.text("[AST] ", NamedTextColor.BLUE).append(message));
+        message = config.defaultColor(message);
+        target.sendMessage(config.prefix().append(message));
     }
 }

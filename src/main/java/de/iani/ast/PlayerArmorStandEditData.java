@@ -1,29 +1,26 @@
 package de.iani.ast;
 
+import de.iani.ast.config.PluginConfig;
 import java.text.NumberFormat;
-import java.util.ArrayList;
+import java.util.Map;
+import java.util.function.BooleanSupplier;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
-import org.bukkit.attribute.AttributeModifier;
-import org.bukkit.attribute.AttributeModifier.Operation;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.EulerAngle;
 
 public class PlayerArmorStandEditData {
+
     public static enum EditState {
         MainWindow,
         RotationWindow,
@@ -41,13 +38,42 @@ public class PlayerArmorStandEditData {
         Size
     }
 
-    private ArmorStandTools plugin;
-    private Player owner;
-    private ArmorStand armorStand;
+    // ---------------------------------------------------------------
+    // General window layout
+    // ---------------------------------------------------------------
 
-    private Inventory armorStandInventory;
-    private ItemStack aktiv;
-    private ItemStack inaktiv;
+    private static final int SLOT_BASEPLATE_TOGGLE = 9 * 0 + 1;
+    private static final int SLOT_ARMS_TOGGLE = 9 * 1 + 1;
+    private static final int SLOT_SMALL_TOGGLE = 9 * 2 + 1;
+    private static final int SLOT_UNMOVEABLE_TOGGLE = 9 * 3 + 1;
+    private static final int SLOT_INVISIBLE_TOGGLE = 9 * 4 + 1;
+    private static final int SLOT_NAME_VISIBLE_TOGGLE = 9 * 5 + 1;
+
+    private static final int SLOT_SIZE_OPEN = 9 * 0 + 4;
+    private static final int SLOT_HEAD_ROTATION_OPEN = 9 * 1 + 4;
+    private static final int SLOT_BODY_ROTATION_OPEN = 9 * 2 + 4;
+    private static final int SLOT_LEFT_ARM_ROTATION_OPEN = 9 * 2 + 3;
+    private static final int SLOT_RIGHT_ARM_ROTATION_OPEN = 9 * 2 + 5;
+    private static final int SLOT_POSITION_OPEN = 9 * 3 + 4;
+
+    private static final int SLOT_POSITION_BOOTS_OPEN = 9 * 4 + 4;
+    private static final int SLOT_LEFT_LEG_ROTATION_OPEN = 9 * 4 + 3;
+    private static final int SLOT_RIGHT_LEG_ROTATION_OPEN = 9 * 4 + 5;
+
+    private static final int SLOT_ROTATION_BACK = 9 * 5;
+
+    private static final EquipmentSlot[] EQUIPMENT_BY_ROW = {
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.OFF_HAND, EquipmentSlot.HAND
+    };
+
+    private final ArmorStandTools plugin;
+    private final PluginConfig config;
+    private final Player owner;
+    private final ArmorStand armorStand;
+
+    private final Inventory armorStandInventory;
+    private final ItemStack activeIcon;
+    private final ItemStack inactiveIcon;
     private EditState editState;
     private RotatablePart rotationToEdit;
     private Location initialLocation;
@@ -55,239 +81,163 @@ public class PlayerArmorStandEditData {
     private int freeRotationAxis;
     private int freeMoveStartTick;
 
-    // Inventory armorStandEditInventory = plugin.getServer().createInventory(event.getPlayer(), 9 * 6, "Rüstungsständer bearbeiten");
-    // event.getPlayer().openInventory(armorStandEditInventory);
-
-    // base plate
-    // arms
-    // can move
-    // small
-    // visible
-    //
-    // item in hand
-    // item in off hand
-    // helmet,chest,legs,feet
-    //
-    // postion (x,y,z)
-    //
-    // body pose (x,y,z)
-    // head pose (x,y,z)
-    // left arm pose (x,y,z)
-    // right arm pose (x,y,z)
-    // left leg pose (x,y,z)
-    // right leg pose (x,y,z)
-
     public PlayerArmorStandEditData(ArmorStandTools plugin, Player owner, ArmorStand armorStand) {
         this.plugin = plugin;
+        this.config = plugin.getPluginConfig();
         this.owner = owner;
         this.armorStand = armorStand;
         this.editState = EditState.MainWindow;
-        aktiv = setItemStackName(new ItemStack(Material.GREEN_DYE), Component.text("aktiv", NamedTextColor.GREEN));
-        inaktiv = setItemStackName(new ItemStack(Material.RED_DYE), Component.text("inaktiv", NamedTextColor.RED));
+        this.activeIcon = config.buildItem("toggle-active", Material.GREEN_DYE);
+        this.inactiveIcon = config.buildItem("toggle-inactive", Material.RED_DYE);
+
         Component name = armorStand.customName();
         if (name == null) {
-            name = Component.text("Rüstungsständer");
+            name = Component.text(config.getDefaultArmorStandName());
         }
-        armorStandInventory = plugin.getServer().createInventory(owner, 9 * 6, Component.empty().append(name).append(Component.text(" bearbeiten")));
+        this.armorStandInventory = plugin.getServer().createInventory(owner, 9 * 6, config.guiTitle(name));
+
         editGeneral();
         owner.openInventory(armorStandInventory);
-    }
-
-    private void editGeneral() {
-        this.editState = EditState.MainWindow;
-        armorStandInventory.clear();
-
-        armorStandInventory.setItem(9 * 0, setItemStackLore(setItemStackNameGold(new ItemStack(Material.STONE_PRESSURE_PLATE), "Bodenplatte")));
-        updateHasBasePlate();
-        armorStandInventory.setItem(9 * 1, setItemStackLore(setItemStackNameGold(new ItemStack(Material.STICK), "Arme")));
-        updateHasArms();
-        armorStandInventory.setItem(9 * 2, setItemStackLore(setItemStackNameGold(new ItemStack(Material.CLAY_BALL), "Verkleinert")));
-        updateIsSmall();
-        armorStandInventory.setItem(9 * 3, setItemStackLore(setItemStackNameGold(new ItemStack(Material.RAIL), "Unbeweglich")));
-        updateIsUnmoveable();
-        armorStandInventory.setItem(9 * 4, setItemStackLore(setItemStackNameGold(new ItemStack(Material.POTION), "Unsichtbar")));
-        updateIsInvisible();
-        armorStandInventory.setItem(9 * 5, setItemStackLore(setItemStackNameGold(new ItemStack(Material.NAME_TAG), "Name sichtbar"), "Der Name kann mit einem", "Namensschild geändert werden."));
-        updateNameIsVisible();
-
-        armorStandInventory.setItem(9 * 0 + 7, setItemStackHideAttributes(setItemStackLore(setItemStackNameGold(new ItemStack(Material.LEATHER_HELMET), "Helm"))));
-        armorStandInventory.setItem(9 * 1 + 7, setItemStackHideAttributes(setItemStackLore(setItemStackNameGold(new ItemStack(Material.LEATHER_CHESTPLATE), "Brustpanzer"))));
-        armorStandInventory.setItem(9 * 2 + 7, setItemStackHideAttributes(setItemStackLore(setItemStackNameGold(new ItemStack(Material.LEATHER_LEGGINGS), "Hose"))));
-        armorStandInventory.setItem(9 * 3 + 7, setItemStackHideAttributes(setItemStackLore(setItemStackNameGold(new ItemStack(Material.LEATHER_BOOTS), "Schuhe"))));
-        armorStandInventory.setItem(9 * 4 + 7, setItemStackLore(setItemStackNameGold(new ItemStack(Material.STICK), "Linke Hand")));
-        armorStandInventory.setItem(9 * 5 + 7, setItemStackLore(setItemStackNameGold(new ItemStack(Material.STICK), "Rechte Hand")));
-        updateArmorstandInventory();
-        updateArmorstandInventoryLater();
-
-        armorStandInventory.setItem(9 * 1 + 4, setItemStackHideAttributes(setItemStackLore(setItemStackNameGold(new ItemStack(Material.IRON_HELMET), "Kopfdrehung"))));
-        armorStandInventory.setItem(9 * 2 + 4, setItemStackHideAttributes(setItemStackLore(setItemStackNameGold(new ItemStack(Material.IRON_CHESTPLATE), "Körperdrehung"))));
-        armorStandInventory.setItem(9 * 2 + 3, setItemStackLore(setItemStackNameGold(new ItemStack(Material.STICK), "Drehung linker Arm")));
-        armorStandInventory.setItem(9 * 2 + 5, setItemStackLore(setItemStackNameGold(new ItemStack(Material.STICK), "Drehung rechter Arm")));
-
-        armorStandInventory.setItem(9 * 3 + 4, setItemStackLore(setItemStackNameGold(new ItemStack(Material.IRON_BLOCK), "Position")));
-        armorStandInventory.setItem(9 * 4 + 3, setItemStackLore(setItemStackNameGold(new ItemStack(Material.STICK), "Drehung linkes Bein")));
-        armorStandInventory.setItem(9 * 4 + 5, setItemStackLore(setItemStackNameGold(new ItemStack(Material.STICK), "Drehung rechtes Bein")));
-
-        armorStandInventory.setItem(9 * 0 + 4, setItemStackLore(setItemStackNameGold(new ItemStack(Material.PUFFERFISH), "Größe")));
     }
 
     public Inventory getInventory() {
         return armorStandInventory;
     }
 
-    private static ItemStack setItemStackNameGold(ItemStack stack, String name) {
-        return setItemStackName(stack, Component.text(name, NamedTextColor.GOLD, TextDecoration.BOLD));
+    public EditState getEditState() {
+        return editState;
     }
 
-    private static ItemStack setItemStackName(ItemStack stack, String name) {
-        return setItemStackName(stack, Component.text(name));
+    public ArmorStand getArmorStand() {
+        return armorStand;
     }
 
-    private static ItemStack setItemStackName(ItemStack stack, Component name) {
-        ItemMeta meta = stack.getItemMeta();
-        meta.displayName(name.decoration(TextDecoration.ITALIC, false));
-        stack.setItemMeta(meta);
-        return stack;
+    public int getFreeMoveStartTick() {
+        return freeMoveStartTick;
     }
 
-    private static ItemStack setItemStackLore(ItemStack stack, String... lore) {
-        ItemMeta meta = stack.getItemMeta();
-        ArrayList<Component> loreComponents = new ArrayList<>();
-        for (String loreLine : lore) {
-            loreComponents.add(Component.text(loreLine).decoration(TextDecoration.ITALIC, false));
-        }
-        meta.lore(loreComponents);
-        stack.setItemMeta(meta);
-        return stack;
-    }
+    // =================================================================
+    // General window
+    // =================================================================
 
-    private static ItemStack setItemStackHideAttributes(ItemStack stack) {
-        ItemMeta meta = stack.getItemMeta();
-        meta.addAttributeModifier(Attribute.ARMOR, new AttributeModifier(NamespacedKey.fromString("armorstandtools:justhide"), 0, Operation.ADD_SCALAR));
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
-        stack.setItemMeta(meta);
-        return stack;
-    }
+    private void editGeneral() {
+        this.editState = EditState.MainWindow;
+        armorStandInventory.clear();
 
-    public void updateHasBasePlate() {
-        if (editState == EditState.MainWindow) {
-            if (armorStand.hasBasePlate()) {
-                armorStandInventory.setItem(9 * 0 + 1, aktiv);
-            } else {
-                armorStandInventory.setItem(9 * 0 + 1, inaktiv);
-            }
-        }
-    }
-
-    public void toggleHasBasePlate() {
-        armorStand.setBasePlate(!armorStand.hasBasePlate());
-        Messages.sendPart(owner, "Bodenplatte ist nun ", Messages.activation(armorStand.hasBasePlate()));
+        armorStandInventory.setItem(9 * 0, config.buildItem("baseplate", Material.STONE_PRESSURE_PLATE));
         updateHasBasePlate();
-    }
-
-    public void updateHasArms() {
-        if (editState == EditState.MainWindow) {
-            if (armorStand.hasArms()) {
-                armorStandInventory.setItem(9 * 1 + 1, aktiv);
-            } else {
-                armorStandInventory.setItem(9 * 1 + 1, inaktiv);
-            }
-        }
-    }
-
-    public void toggleHasArms() {
-        armorStand.setArms(!armorStand.hasArms());
-        Messages.sendPart(owner, "Arme sind nun ", Messages.activation(armorStand.hasArms()));
+        armorStandInventory.setItem(9 * 1, config.buildItem("arms", Material.STICK));
         updateHasArms();
-    }
-
-    public void updateIsSmall() {
-        if (editState == EditState.MainWindow) {
-            if (armorStand.isSmall()) {
-                armorStandInventory.setItem(9 * 2 + 1, aktiv);
-            } else {
-                armorStandInventory.setItem(9 * 2 + 1, inaktiv);
-            }
-        }
-    }
-
-    public void toggleIsSmall() {
-        armorStand.setSmall(!armorStand.isSmall());
-        Messages.sendPart(owner, "Verkleinert ist nun ", Messages.activation(armorStand.isSmall()));
+        armorStandInventory.setItem(9 * 2, config.buildItem("small", Material.CLAY_BALL));
         updateIsSmall();
-    }
-
-    public void updateIsUnmoveable() {
-        if (editState == EditState.MainWindow) {
-            if (!armorStand.hasGravity()) {
-                armorStandInventory.setItem(9 * 3 + 1, aktiv);
-            } else {
-                armorStandInventory.setItem(9 * 3 + 1, inaktiv);
-            }
-        }
-    }
-
-    public void toggleIsUnmoveable() {
-        armorStand.setGravity(!armorStand.hasGravity());
-        Messages.sendPart(owner, "Unbeweglich ist nun ", Messages.activation(!armorStand.hasGravity()));
+        armorStandInventory.setItem(9 * 3, config.buildItem("unmoveable", Material.RAIL));
         updateIsUnmoveable();
-    }
-
-    public void updateIsInvisible() {
-        if (editState == EditState.MainWindow) {
-            if (!armorStand.isVisible()) {
-                armorStandInventory.setItem(9 * 4 + 1, aktiv);
-            } else {
-                armorStandInventory.setItem(9 * 4 + 1, inaktiv);
-            }
-        }
-    }
-
-    public void toggleIsInvisible() {
-        armorStand.setVisible(!armorStand.isVisible());
-        Messages.sendPart(owner, "Unsichtbar ist nun ", Messages.activation(!armorStand.isVisible()));
+        armorStandInventory.setItem(9 * 4, config.buildItem("invisible", Material.POTION));
         updateIsInvisible();
+        armorStandInventory.setItem(9 * 5, config.buildItem("name-visible", Material.NAME_TAG));
+        updateNameIsVisible();
+
+        armorStandInventory.setItem(9 * 0 + 7, config.buildItem("helmet", Material.LEATHER_HELMET));
+        armorStandInventory.setItem(9 * 1 + 7, config.buildItem("chestplate", Material.LEATHER_CHESTPLATE));
+        armorStandInventory.setItem(9 * 2 + 7, config.buildItem("leggings", Material.LEATHER_LEGGINGS));
+        armorStandInventory.setItem(9 * 3 + 7, config.buildItem("boots", Material.LEATHER_BOOTS));
+        armorStandInventory.setItem(9 * 4 + 7, config.buildItem("left-hand", Material.STICK));
+        armorStandInventory.setItem(9 * 5 + 7, config.buildItem("right-hand", Material.STICK));
+        updateArmorstandInventory();
+        updateArmorstandInventoryLater();
+
+        armorStandInventory.setItem(SLOT_HEAD_ROTATION_OPEN, config.buildItem("head-rotation", Material.IRON_HELMET));
+        armorStandInventory.setItem(SLOT_BODY_ROTATION_OPEN, config.buildItem("body-rotation", Material.IRON_CHESTPLATE));
+        armorStandInventory.setItem(SLOT_LEFT_ARM_ROTATION_OPEN, config.buildItem("left-arm-rotation", Material.STICK));
+        armorStandInventory.setItem(SLOT_RIGHT_ARM_ROTATION_OPEN, config.buildItem("right-arm-rotation", Material.STICK));
+
+        armorStandInventory.setItem(SLOT_POSITION_OPEN, config.buildItem("position", Material.IRON_LEGGINGS));
+        armorStandInventory.setItem(SLOT_LEFT_LEG_ROTATION_OPEN, config.buildItem("left-leg-rotation", Material.STICK));
+        armorStandInventory.setItem(SLOT_RIGHT_LEG_ROTATION_OPEN, config.buildItem("right-leg-rotation", Material.STICK));
+        armorStandInventory.setItem(SLOT_POSITION_BOOTS_OPEN, config.buildItem("position-boots", Material.IRON_BOOTS));
+
+        armorStandInventory.setItem(SLOT_SIZE_OPEN, config.buildItem("size", Material.PUFFERFISH));
     }
 
-    public void updateNameIsVisible() {
+    private void setStatusIcon(int slot, boolean active) {
         if (editState == EditState.MainWindow) {
-            if (armorStand.isCustomNameVisible()) {
-                armorStandInventory.setItem(9 * 5 + 1, aktiv);
-            } else {
-                armorStandInventory.setItem(9 * 5 + 1, inaktiv);
-            }
+            armorStandInventory.setItem(slot, active ? activeIcon : inactiveIcon);
         }
     }
 
-    public void toggleNameIsVisible() {
-        armorStand.setCustomNameVisible(!armorStand.isCustomNameVisible());
-        Messages.sendPart(owner, "Namenanzeige ist nun ", Messages.activation(armorStand.isCustomNameVisible()));
-        updateNameIsVisible();
+    private void toggle(Runnable mutate, BooleanSupplier activeAfter, Runnable updateIcon, String messageKey) {
+        mutate.run();
+        Messages.send(owner, config.messageWithComponent(messageKey, "status", Messages.activation(activeAfter.getAsBoolean())));
+        updateIcon.run();
     }
 
-    public void updateArmorstandInventory() {
+    private void updateHasBasePlate() {
+        setStatusIcon(SLOT_BASEPLATE_TOGGLE, armorStand.hasBasePlate());
+    }
+
+    private void toggleHasBasePlate() {
+        toggle(() -> armorStand.setBasePlate(!armorStand.hasBasePlate()), armorStand::hasBasePlate, this::updateHasBasePlate, "baseplate-toggled");
+    }
+
+    private void updateHasArms() {
+        setStatusIcon(SLOT_ARMS_TOGGLE, armorStand.hasArms());
+    }
+
+    private void toggleHasArms() {
+        toggle(() -> armorStand.setArms(!armorStand.hasArms()), armorStand::hasArms, this::updateHasArms, "arms-toggled");
+    }
+
+    private void updateIsSmall() {
+        setStatusIcon(SLOT_SMALL_TOGGLE, armorStand.isSmall());
+    }
+
+    private void toggleIsSmall() {
+        toggle(() -> armorStand.setSmall(!armorStand.isSmall()), armorStand::isSmall, this::updateIsSmall, "small-toggled");
+    }
+
+    private void updateIsUnmoveable() {
+        setStatusIcon(SLOT_UNMOVEABLE_TOGGLE, !armorStand.hasGravity());
+    }
+
+    private void toggleIsUnmoveable() {
+        toggle(() -> armorStand.setGravity(!armorStand.hasGravity()), () -> !armorStand.hasGravity(), this::updateIsUnmoveable, "unmoveable-toggled");
+    }
+
+    private void updateIsInvisible() {
+        setStatusIcon(SLOT_INVISIBLE_TOGGLE, !armorStand.isVisible());
+    }
+
+    private void toggleIsInvisible() {
+        toggle(() -> armorStand.setVisible(!armorStand.isVisible()), () -> !armorStand.isVisible(), this::updateIsInvisible, "invisible-toggled");
+    }
+
+    private void updateNameIsVisible() {
+        setStatusIcon(SLOT_NAME_VISIBLE_TOGGLE, armorStand.isCustomNameVisible());
+    }
+
+    private void toggleNameIsVisible() {
+        toggle(() -> armorStand.setCustomNameVisible(!armorStand.isCustomNameVisible()), armorStand::isCustomNameVisible, this::updateNameIsVisible, "name-visible-toggled");
+    }
+
+    private void updateArmorstandInventory() {
         if (editState == EditState.MainWindow) {
-            armorStandInventory.setItem(9 * 0 + 8, armorStand.getEquipment().getHelmet());
-            armorStandInventory.setItem(9 * 1 + 8, armorStand.getEquipment().getChestplate());
-            armorStandInventory.setItem(9 * 2 + 8, armorStand.getEquipment().getLeggings());
-            armorStandInventory.setItem(9 * 3 + 8, armorStand.getEquipment().getBoots());
-            armorStandInventory.setItem(9 * 4 + 8, armorStand.getEquipment().getItemInOffHand());
-            armorStandInventory.setItem(9 * 5 + 8, armorStand.getEquipment().getItemInMainHand());
+            for (int row = 0; row < EQUIPMENT_BY_ROW.length; row++) {
+                armorStandInventory.setItem(9 * row + 8, armorStand.getEquipment().getItem(EQUIPMENT_BY_ROW[row]));
+            }
         }
     }
 
     private void updateArmorstandInventoryLater() {
         if (editState == EditState.MainWindow) {
-            plugin.getServer().getScheduler().runTask(plugin, new Runnable() {
-                @Override
-                public void run() {
-                    updateArmorstandInventory();
-                }
-            });
+            plugin.getServer().getScheduler().runTask(plugin, this::updateArmorstandInventory);
         }
     }
 
-    public void updateRotationInventory() {
+    // =================================================================
+    // Rotation window
+    // =================================================================
+
+    private void updateRotationInventory() {
         double x = 0;
         double y = 0;
         double z = 0;
@@ -295,7 +245,7 @@ public class PlayerArmorStandEditData {
 
         EulerAngle angle = null;
         final boolean isMove = rotationToEdit == RotatablePart.Position;
-        String appendix = isMove ? "" : "°";
+        String unit = isMove ? "" : "°";
         if (rotationToEdit == RotatablePart.Head) {
             angle = armorStand.getHeadPose();
         } else if (rotationToEdit == RotatablePart.Body) {
@@ -311,9 +261,8 @@ public class PlayerArmorStandEditData {
         } else if (rotationToEdit == RotatablePart.Size) {
             x = armorStand.getAttribute(Attribute.SCALE).getBaseValue();
             NumberFormat format = NumberFormat.getNumberInstance();
-            ItemStack stackx = setItemStackName(new ItemStack(Material.YELLOW_DYE), "Size = " + format.format(x));
-            stackx = setItemStackLore(stackx, "Mit Klick auf 1 setzen.");
-            armorStandInventory.setItem(9 * 0 + 3, stackx);
+            Component itemName = config.message("format-scale-item", Map.of("value", format.format(x)));
+            armorStandInventory.setItem(9 * 0 + 3, config.buildDynamicItem("value-display", Material.YELLOW_DYE, itemName, config.message("lore-reset-one")));
             return;
         } else if (isMove) {
             x = armorStand.getLocation().getX();
@@ -326,25 +275,35 @@ public class PlayerArmorStandEditData {
             y = angle.getY();
             z = angle.getZ();
         }
+
         NumberFormat format = NumberFormat.getNumberInstance();
-        ItemStack stackx = setItemStackName(new ItemStack(Material.YELLOW_DYE), "x = " + format.format(isMove ? x : radToDegree(x)) + appendix);
-        ItemStack stacky = setItemStackName(new ItemStack(Material.YELLOW_DYE), "y = " + format.format(isMove ? y : radToDegree(y)) + appendix);
-        ItemStack stackz = setItemStackName(new ItemStack(Material.YELLOW_DYE), "z = " + format.format(isMove ? z : radToDegree(z)) + appendix);
+        Component nameX = config.message("format-axis", Map.of("axis", "x", "value", format.format(isMove ? x : radToDegree(x)), "unit", unit));
+        Component nameY = config.message("format-axis", Map.of("axis", "y", "value", format.format(isMove ? y : radToDegree(y)), "unit", unit));
+        Component nameZ = config.message("format-axis", Map.of("axis", "z", "value", format.format(isMove ? z : radToDegree(z)), "unit", unit));
+
+        ItemStack stackx;
+        ItemStack stacky;
+        ItemStack stackz;
         if (rotationToEdit != RotatablePart.Position) {
-            stackx = setItemStackLore(stackx, "Mit Klick auf 0 setzen.");
-            stacky = setItemStackLore(stacky, "Mit Klick auf 0 setzen.");
-            stackz = setItemStackLore(stackz, "Mit Klick auf 0 setzen.");
+            Component resetLore = config.message("lore-reset-zero");
+            stackx = config.buildDynamicItem("value-display", Material.YELLOW_DYE, nameX, resetLore);
+            stacky = config.buildDynamicItem("value-display", Material.YELLOW_DYE, nameY, resetLore);
+            stackz = config.buildDynamicItem("value-display", Material.YELLOW_DYE, nameZ, resetLore);
+        } else {
+            stackx = config.buildDynamicItem("value-display", Material.YELLOW_DYE, nameX);
+            stacky = config.buildDynamicItem("value-display", Material.YELLOW_DYE, nameY);
+            stackz = config.buildDynamicItem("value-display", Material.YELLOW_DYE, nameZ);
         }
         armorStandInventory.setItem(9 * 0 + 3, stackx);
         armorStandInventory.setItem(9 * 1 + 3, stacky);
         armorStandInventory.setItem(9 * 2 + 3, stackz);
         if (isMove) {
-            armorStandInventory.setItem(9 * 3 + 3, setItemStackLore(setItemStackName(new ItemStack(Material.YELLOW_DYE), "yaw = " + format.format(yaw) + "°"), "Mit Klick auf 0 setzen."));
-            // armorStandInventory.setItem(9 * 4 + 3, setItemStackName(new Dye(DyeColor.YELLOW).toItemStack(1), "pitch = " + format.format(pitch)));
+            Component yawName = config.message("format-yaw", Map.of("label", "yaw", "value", format.format(yaw)));
+            armorStandInventory.setItem(9 * 3 + 3, config.buildDynamicItem("value-display", Material.YELLOW_DYE, yawName, config.message("lore-reset-zero")));
         }
     }
 
-    private void editRotation(RotatablePart part) {
+    private void openRotationMenu(RotatablePart part) {
         editState = EditState.RotationWindow;
         rotationToEdit = part;
         armorStandInventory.clear();
@@ -352,157 +311,181 @@ public class PlayerArmorStandEditData {
         if (part == RotatablePart.Position) {
             for (int row = 0; row < 4; row++) {
                 if (row < 3) {
-                    armorStandInventory.setItem(9 * row + 0, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-1.0"), "Shift+Klick: -0.001"));
-                    armorStandInventory.setItem(9 * row + 1, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-0.1"), "Shift+Klick: -0.0001"));
-                    armorStandInventory.setItem(9 * row + 2, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-0.01"), "Shift+Klick: -0.00001"));
-                    armorStandInventory.setItem(9 * row + 4, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+0.01"), "Shift+Klick: +0.00001"));
-                    armorStandInventory.setItem(9 * row + 5, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+0.1"), "Shift+Klick: +0.0001"));
-                    armorStandInventory.setItem(9 * row + 6, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+1.0"), "Shift+Klick: +0.001"));
-                    armorStandInventory.setItem(9 * row + 8, setItemStackName(new ItemStack(Material.CYAN_DYE), "Frei bearbeiten"));
+                    setPositionRowItems(row);
                 } else {
-                    setRowRotationItems(row);
+                    setRotationRowItems(row);
                 }
             }
         } else if (part == RotatablePart.Size) {
-            int row = 0;
-            armorStandInventory.setItem(9 * row + 0, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-1.0"), "Shift+Klick: -0.001"));
-            armorStandInventory.setItem(9 * row + 1, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-0.1"), "Shift+Klick: -0.0001"));
-            armorStandInventory.setItem(9 * row + 2, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-0.01"), "Shift+Klick: -0.00001"));
-            armorStandInventory.setItem(9 * row + 4, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+0.01"), "Shift+Klick: +0.00001"));
-            armorStandInventory.setItem(9 * row + 5, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+0.1"), "Shift+Klick: +0.0001"));
-            armorStandInventory.setItem(9 * row + 6, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+1.0"), "Shift+Klick: +0.001"));
-            armorStandInventory.setItem(9 * row + 8, setItemStackName(new ItemStack(Material.CYAN_DYE), "Frei bearbeiten"));
+            setPositionRowItems(0);
         } else {
             for (int row = 0; row < 3; row++) {
-                setRowRotationItems(row);
+                setRotationRowItems(row);
             }
         }
 
-        armorStandInventory.setItem(9 * 5 + 0, setItemStackName(new ItemStack(Material.MAGENTA_DYE), "zurück"));
+        armorStandInventory.setItem(SLOT_ROTATION_BACK, config.buildItem("back-button", Material.MAGENTA_DYE));
 
         updateRotationInventory();
     }
 
-    private void setRowRotationItems(int row) {
-        armorStandInventory.setItem(9 * row + 0, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-90.0°"), "Shift+Klick: -0.1°"));
-        armorStandInventory.setItem(9 * row + 1, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-10.0°"), "Shift+Klick: -0.01°"));
-        armorStandInventory.setItem(9 * row + 2, setItemStackLore(setItemStackName(new ItemStack(Material.RED_DYE), "-1.0°"), "Shift+Klick: -0.001°"));
-        armorStandInventory.setItem(9 * row + 4, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+1.0°"), "Shift+Klick: +0.01°"));
-        armorStandInventory.setItem(9 * row + 5, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+10.0°"), "Shift+Klick: +0.01°"));
-        armorStandInventory.setItem(9 * row + 6, setItemStackLore(setItemStackName(new ItemStack(Material.GREEN_DYE), "+90.0°"), "Shift+Klick: +0.1°"));
-        armorStandInventory.setItem(9 * row + 8, setItemStackName(new ItemStack(Material.CYAN_DYE), "Frei bearbeiten"));
+    private void setPositionRowItems(int row) {
+        armorStandInventory.setItem(9 * row + 0, deltaButton(false, "-1.0", "-0.001"));
+        armorStandInventory.setItem(9 * row + 1, deltaButton(false, "-0.1", "-0.0001"));
+        armorStandInventory.setItem(9 * row + 2, deltaButton(false, "-0.01", "-0.00001"));
+        armorStandInventory.setItem(9 * row + 4, deltaButton(true, "+0.01", "+0.00001"));
+        armorStandInventory.setItem(9 * row + 5, deltaButton(true, "+0.1", "+0.0001"));
+        armorStandInventory.setItem(9 * row + 6, deltaButton(true, "+1.0", "+0.001"));
+        armorStandInventory.setItem(9 * row + 8, config.buildItem("free-edit-button", Material.CYAN_DYE));
     }
 
-    private void editRotation(int xyz, double diff) {
-        NumberFormat format = NumberFormat.getNumberInstance();
-        format.setMaximumFractionDigits(5);
+    private void setRotationRowItems(int row) {
+        armorStandInventory.setItem(9 * row + 0, deltaButton(false, "-90.0°", "-0.1°"));
+        armorStandInventory.setItem(9 * row + 1, deltaButton(false, "-10.0°", "-0.01°"));
+        armorStandInventory.setItem(9 * row + 2, deltaButton(false, "-1.0°", "-0.001°"));
+        armorStandInventory.setItem(9 * row + 4, deltaButton(true, "+1.0°", "+0.01°"));
+        armorStandInventory.setItem(9 * row + 5, deltaButton(true, "+10.0°", "+0.01°"));
+        armorStandInventory.setItem(9 * row + 6, deltaButton(true, "+90.0°", "+0.1°"));
+        armorStandInventory.setItem(9 * row + 8, config.buildItem("free-edit-button", Material.CYAN_DYE));
+    }
 
-        EulerAngle angle = null;
-        if (rotationToEdit == RotatablePart.Head) {
-            angle = armorStand.getHeadPose();
-        } else if (rotationToEdit == RotatablePart.Body) {
-            angle = armorStand.getBodyPose();
-        } else if (rotationToEdit == RotatablePart.LeftArm) {
-            angle = armorStand.getLeftArmPose();
-        } else if (rotationToEdit == RotatablePart.RightArm) {
-            angle = armorStand.getRightArmPose();
-        } else if (rotationToEdit == RotatablePart.LeftLeg) {
-            angle = armorStand.getLeftLegPose();
-        } else if (rotationToEdit == RotatablePart.RightLeg) {
-            angle = armorStand.getRightLegPose();
+    private ItemStack deltaButton(boolean positive, String label, String shiftLabel) {
+        String key = positive ? "delta-positive" : "delta-negative";
+        Material fallback = positive ? Material.GREEN_DYE : Material.RED_DYE;
+        Component name = Component.text(label);
+        Component lore = config.message("format-shift-lore", Map.of("value", shiftLabel));
+        return config.buildDynamicItem(key, fallback, name, lore);
+    }
+
+    private double degreeToRad(double degree) {
+        return degree * (Math.PI / 180.0);
+    }
+
+    private double radToDegree(double rad) {
+        return rad * (180.0 / Math.PI);
+    }
+
+    // =================================================================
+    // Click / drag routing
+    // =================================================================
+
+    private void handleModificationSlotClick(int slot, boolean shift) {
+        if (editState == EditState.MainWindow) {
+            handleGeneralWindowClick(slot);
+        } else if (editState == EditState.RotationWindow) {
+            handleRotationWindowClick(slot, shift);
+        }
+    }
+
+    private void handleGeneralWindowClick(int slot) {
+        if (slot == SLOT_BASEPLATE_TOGGLE) {
+            toggleHasBasePlate();
+        } else if (slot == SLOT_ARMS_TOGGLE) {
+            toggleHasArms();
+        } else if (slot == SLOT_SMALL_TOGGLE) {
+            toggleIsSmall();
+        } else if (slot == SLOT_UNMOVEABLE_TOGGLE) {
+            toggleIsUnmoveable();
+        } else if (slot == SLOT_INVISIBLE_TOGGLE) {
+            toggleIsInvisible();
+        } else if (slot == SLOT_NAME_VISIBLE_TOGGLE) {
+            toggleNameIsVisible();
+        } else if (slot == SLOT_HEAD_ROTATION_OPEN) {
+            openRotationMenu(RotatablePart.Head);
+        } else if (slot == SLOT_BODY_ROTATION_OPEN) {
+            openRotationMenu(RotatablePart.Body);
+        } else if (slot == SLOT_LEFT_ARM_ROTATION_OPEN) {
+            openRotationMenu(RotatablePart.LeftArm);
+        } else if (slot == SLOT_RIGHT_ARM_ROTATION_OPEN) {
+            openRotationMenu(RotatablePart.RightArm);
+        } else if (slot == SLOT_LEFT_LEG_ROTATION_OPEN) {
+            openRotationMenu(RotatablePart.LeftLeg);
+        } else if (slot == SLOT_RIGHT_LEG_ROTATION_OPEN) {
+            openRotationMenu(RotatablePart.RightLeg);
+        } else if (slot == SLOT_POSITION_OPEN) {
+            openRotationMenu(RotatablePart.Position);
+        } else if (slot == SLOT_POSITION_BOOTS_OPEN) {
+            openRotationMenu(RotatablePart.Position);
+        } else if (slot == SLOT_SIZE_OPEN) {
+            openRotationMenu(RotatablePart.Size);
+        }
+    }
+
+    private void handleRotationWindowClick(int slot, boolean shift) {
+        int row = slot / 9;
+        int slotInRow = slot % 9;
+
+        int rowsAvailable = 3;
+        boolean isDegreeRow = true;
+        if (rotationToEdit == RotatablePart.Position) {
+            rowsAvailable = 4;
+            if (row < 3) {
+                isDegreeRow = false;
+            }
         } else if (rotationToEdit == RotatablePart.Size) {
-            if (xyz == 0) {
-                AttributeInstance scaleAttribute = armorStand.getAttribute(Attribute.SCALE);
-                double value = Double.isFinite(diff) ? scaleAttribute.getBaseValue() + diff : 1.0;
-                if (value < 1f / 16f) {
-                    value = 1f / 16f;
-                }
-                int max = owner.hasPermission("armorstandtools.unlimitedsize") ? 16 : 4;
-                if (value > max) {
-                    value = max;
-                }
-                scaleAttribute.setBaseValue(value);
-                if (editState != EditState.RotationWithoutWindow) {
-                    Messages.send(owner, "Scale = " + format.format(value));
-                }
-            }
-        } else if (rotationToEdit == RotatablePart.Position) {
-            Location location = armorStand.getLocation();
-            if (xyz == 0 && Double.isFinite(diff)) {
-                location.setX(location.getX() + diff);
-                if (editState != EditState.RotationWithoutWindow) {
-                    Messages.send(owner, "X = " + format.format(location.getX()));
-                }
-            } else if (xyz == 1 && Double.isFinite(diff)) {
-                location.setY(Math.max(Math.min(location.getY() + diff, location.getWorld().getMaxHeight()), location.getWorld().getMinHeight()));
-                if (editState != EditState.RotationWithoutWindow) {
-                    Messages.send(owner, "Y = " + format.format(location.getY()));
-                }
-            } else if (xyz == 2 && Double.isFinite(diff)) {
-                location.setZ(location.getZ() + diff);
-                if (editState != EditState.RotationWithoutWindow) {
-                    Messages.send(owner, "Z = " + format.format(location.getZ()));
-                }
-            } else if (xyz == 3) {
-                location.setYaw(Double.isFinite(diff) ? ((float) (location.getYaw() + radToDegree(diff))) : 0.0f);
-                if (editState != EditState.RotationWithoutWindow) {
-                    Messages.send(owner, "Yaw = " + format.format(location.getYaw()) + "°");
-                }
-                // } else if (xyz == 4) {
-                // location.setPitch((float) (location.getPitch() + diff * 30));
-                // if (editState != EditState.RotationWithoutWindow) {
-                // owner.sendMessage(ChatColor.BLUE + "[AST] " + ChatColor.GOLD + "Pitch = " + format.format(location.getPitch()));
-                // }
-            }
-            ArmorStandTeleportEvent event = new ArmorStandTeleportEvent(armorStand, location, owner);
-            plugin.getServer().getPluginManager().callEvent(event);
-            if (!event.isCancelled()) {
-                armorStand.teleport(location);
-                if (rotationToEdit == RotatablePart.Position && xyz == 1) {
-                    armorStand.setGravity(false);
-                }
-                // ((CraftArmorStand) armorStand).getHandle().impulse = true;
-            }
-        }
-        if (angle != null) {
-            if (xyz == 0) {
-                angle = angle.setX(Double.isFinite(diff) ? (angle.getX() + diff) : 0.0f);
-                if (editState != EditState.RotationWithoutWindow) {
-                    Messages.send(owner, "X = " + format.format(radToDegree(angle.getX())) + "°");
-                }
-            } else if (xyz == 1) {
-                angle = angle.setY(Double.isFinite(diff) ? (angle.getY() + diff) : 0.0f);
-                if (editState != EditState.RotationWithoutWindow) {
-                    Messages.send(owner, "Y = " + format.format(radToDegree(angle.getY())) + "°");
-                }
-            } else if (xyz == 2) {
-                angle = angle.setZ(Double.isFinite(diff) ? (angle.getZ() + diff) : 0.0f);
-                if (editState != EditState.RotationWithoutWindow) {
-                    Messages.send(owner, "Z = " + format.format(radToDegree(angle.getZ())) + "°");
-                }
-            }
-
-            if (rotationToEdit == RotatablePart.Head) {
-                armorStand.setHeadPose(angle);
-            } else if (rotationToEdit == RotatablePart.Body) {
-                armorStand.setBodyPose(angle);
-            } else if (rotationToEdit == RotatablePart.LeftArm) {
-                armorStand.setLeftArmPose(angle);
-            } else if (rotationToEdit == RotatablePart.RightArm) {
-                armorStand.setRightArmPose(angle);
-            } else if (rotationToEdit == RotatablePart.LeftLeg) {
-                armorStand.setLeftLegPose(angle);
-            } else if (rotationToEdit == RotatablePart.RightLeg) {
-                armorStand.setRightLegPose(angle);
-            }
+            rowsAvailable = 1;
+            isDegreeRow = false;
         }
 
-        updateRotationInventory();
+        if (row >= 0 && row < rowsAvailable) {
+            if (slotInRow >= 0 && slotInRow <= 6) {
+                double delta = deltaForSlot(slotInRow, isDegreeRow, shift);
+                if (delta != 0.0) {
+                    applyRotationDelta(row, delta);
+                }
+            }
+            if (slotInRow == 8) {
+                startFreeEdit(row);
+            }
+        } else if (slot == SLOT_ROTATION_BACK) {
+            editGeneral();
+        }
+    }
+
+    private double deltaForSlot(int slotInRow, boolean isDegreeRow, boolean shift) {
+        double delta;
+        if (slotInRow == 0) {
+            delta = !isDegreeRow ? -1 : degreeToRad(-90);
+        } else if (slotInRow == 1) {
+            delta = !isDegreeRow ? -0.1 : degreeToRad(-10);
+        } else if (slotInRow == 2) {
+            delta = !isDegreeRow ? -0.01 : degreeToRad(-1);
+        } else if (slotInRow == 3) {
+
+            delta = Double.NaN;
+        } else if (slotInRow == 4) {
+            delta = !isDegreeRow ? 0.01 : degreeToRad(1);
+        } else if (slotInRow == 5) {
+            delta = !isDegreeRow ? 0.1 : degreeToRad(10);
+        } else if (slotInRow == 6) {
+            delta = !isDegreeRow ? 1 : degreeToRad(90);
+        } else {
+            return 0.0;
+        }
+        if (shift && !Double.isNaN(delta)) {
+            if (!isDegreeRow || (slotInRow != 0 && slotInRow != 6)) {
+                delta *= 0.001;
+            } else {
+                delta = degreeToRad(slotInRow == 0 ? -0.1 : 0.1);
+            }
+        }
+        return delta;
+    }
+
+    private void startFreeEdit(int row) {
+        editState = EditState.RotationWithoutWindow;
+        initialLocation = owner.getLocation();
+        lastLocation = initialLocation.clone();
+        freeRotationAxis = row;
+        freeMoveStartTick = plugin.getServer().getCurrentTick();
+        owner.closeInventory();
+        Messages.send(owner, config.message("free-edit-activated"));
+        Messages.send(owner, config.message("free-edit-instruction"));
+        Messages.sendSuccess(owner, config.message("free-edit-confirm"));
     }
 
     public void onInventoryClicked(int slot, InventoryClickEvent event) {
         int col = slot % 9;
-        // int row = slot / 9;
         if (editState == EditState.MainWindow && col == 8) {
             boolean cancel = true;
             if (event.getAction() == InventoryAction.PICKUP_ALL || event.getAction() == InventoryAction.SWAP_WITH_CURSOR) {
@@ -554,140 +537,14 @@ public class PlayerArmorStandEditData {
         }
     }
 
-    private double degreeToRad(double degree) {
-        return degree * (Math.PI / 180.0);
-    }
-
-    private double radToDegree(double rad) {
-        return rad * (180.0 / Math.PI);
-    }
-
-    private void handleModificationSlotClick(int slot, boolean shift) {
-        if (editState == EditState.MainWindow) {
-            if (slot == 9 * 0 + 1) {
-                toggleHasBasePlate();
-            } else if (slot == 9 * 1 + 1) {
-                toggleHasArms();
-            } else if (slot == 9 * 2 + 1) {
-                toggleIsSmall();
-            } else if (slot == 9 * 3 + 1) {
-                toggleIsUnmoveable();
-            } else if (slot == 9 * 4 + 1) {
-                toggleIsInvisible();
-            } else if (slot == 9 * 5 + 1) {
-                toggleNameIsVisible();
-            } else if (slot == 9 * 1 + 4) {
-                editRotation(RotatablePart.Head);
-            } else if (slot == 9 * 2 + 4) {
-                editRotation(RotatablePart.Body);
-            } else if (slot == 9 * 2 + 3) {
-                editRotation(RotatablePart.LeftArm);
-            } else if (slot == 9 * 2 + 5) {
-                editRotation(RotatablePart.RightArm);
-            } else if (slot == 9 * 4 + 3) {
-                editRotation(RotatablePart.LeftLeg);
-            } else if (slot == 9 * 4 + 5) {
-                editRotation(RotatablePart.RightLeg);
-            } else if (slot == 9 * 3 + 4) {
-                editRotation(RotatablePart.Position);
-            } else if (slot == 9 * 0 + 4) {
-                editRotation(RotatablePart.Size);
-            }
-        } else if (editState == EditState.RotationWindow) {
-            int row = slot / 9;
-            int slotInRow = slot % 9;
-
-            int rowsAvailable = 3;
-            boolean degree = true;
-            if (rotationToEdit == RotatablePart.Position) {
-                rowsAvailable = 4;
-                if (row < 3) {
-                    degree = false;
-                }
-            } else if (rotationToEdit == RotatablePart.Size) {
-                rowsAvailable = 1;
-                degree = false;
-            }
-
-            if (row >= 0 && row < rowsAvailable) {
-                if (slotInRow >= 0 && slotInRow <= 6) {
-                    // +/-
-                    double add = 0;
-                    if (slotInRow == 0) {
-                        add = !degree ? -1 : degreeToRad(-90);
-                    } else if (slotInRow == 1) {
-                        add = !degree ? -0.1 : degreeToRad(-10);
-                    } else if (slotInRow == 2) {
-                        add = !degree ? -0.01 : degreeToRad(-1);
-                    } else if (slotInRow == 3) {
-                        add = Double.NaN;
-                    } else if (slotInRow == 4) {
-                        add = !degree ? 0.01 : degreeToRad(1);
-                    } else if (slotInRow == 5) {
-                        add = !degree ? 0.1 : degreeToRad(10);
-                    } else if (slotInRow == 6) {
-                        add = !degree ? 1 : degreeToRad(90);
-                    }
-                    if (shift && !Double.isNaN(add)) {
-                        if (!degree || (slotInRow != 0 && slotInRow != 6)) {
-                            add *= 0.001;
-                        } else {
-                            add = degreeToRad(slotInRow == 0 ? -0.1 : 0.1);
-                        }
-                    }
-                    if (add != 0.0) {
-                        editRotation(row, add);
-                    }
-                }
-                if (slotInRow == 8) {
-                    editState = EditState.RotationWithoutWindow;
-                    initialLocation = owner.getLocation();
-                    lastLocation = initialLocation.clone();
-                    freeRotationAxis = row;
-                    freeMoveStartTick = plugin.getServer().getCurrentTick();
-                    owner.closeInventory();
-                    Messages.send(owner, "Freie Modifikation aktiviert.");
-                    Messages.send(owner, "Bewege dich, um den Rüstungsständer zu verändern.");
-                    Messages.sendSuccess(owner, "Linksklick zum Bestätigen.");
-                }
-            } else if (slot == 9 * 5 + 0) {
-                editGeneral();
-            }
-        }
-    }
-
     private boolean placeItemInSlot(int slot, ItemStack newInSlot) {
         updateArmorstandInventoryLater();
-        // we have to check if the item in the display inventory is the item on the armor stand
-        // - if it is not the same, it was modified by something else and we cancel and refresh the inv
-        if (slot == 9 * 0 + 8) {
-            if (ArmorStandTools.itemStackEquals(armorStand.getEquipment().getHelmet(), armorStandInventory.getItem(9 * 0 + 8))) {
-                armorStand.getEquipment().setHelmet(newInSlot);
-                return true;
-            }
-        } else if (slot == 9 * 1 + 8) {
-            if (ArmorStandTools.itemStackEquals(armorStand.getEquipment().getChestplate(), armorStandInventory.getItem(9 * 1 + 8))) {
-                armorStand.getEquipment().setChestplate(newInSlot);
-                return true;
-            }
-        } else if (slot == 9 * 2 + 8) {
-            if (ArmorStandTools.itemStackEquals(armorStand.getEquipment().getLeggings(), armorStandInventory.getItem(9 * 2 + 8))) {
-                armorStand.getEquipment().setLeggings(newInSlot);
-                return true;
-            }
-        } else if (slot == 9 * 3 + 8) {
-            if (ArmorStandTools.itemStackEquals(armorStand.getEquipment().getBoots(), armorStandInventory.getItem(9 * 3 + 8))) {
-                armorStand.getEquipment().setBoots(newInSlot);
-                return true;
-            }
-        } else if (slot == 9 * 4 + 8) {
-            if (ArmorStandTools.itemStackEquals(armorStand.getEquipment().getItemInOffHand(), armorStandInventory.getItem(9 * 4 + 8))) {
-                armorStand.getEquipment().setItemInOffHand(newInSlot);
-                return true;
-            }
-        } else if (slot == 9 * 5 + 8) {
-            if (ArmorStandTools.itemStackEquals(armorStand.getEquipment().getItemInMainHand(), armorStandInventory.getItem(9 * 5 + 8))) {
-                armorStand.getEquipment().setItemInMainHand(newInSlot);
+        int row = slot / 9;
+        int col = slot % 9;
+        if (col == 8 && row >= 0 && row < EQUIPMENT_BY_ROW.length) {
+            EquipmentSlot equipmentSlot = EQUIPMENT_BY_ROW[row];
+            if (ArmorStandTools.itemStackEquals(armorStand.getEquipment().getItem(equipmentSlot), armorStandInventory.getItem(slot))) {
+                armorStand.getEquipment().setItem(equipmentSlot, newInSlot);
                 return true;
             }
         }
@@ -696,30 +553,120 @@ public class PlayerArmorStandEditData {
 
     public void onPlayerMove(Location to) {
         if (editState == EditState.RotationWithoutWindow && lastLocation != null && initialLocation != null) {
-            if (to.getWorld() != initialLocation.getWorld() || to.distanceSquared(initialLocation) > 15 * 15) {
+            double maxDistance = config.getMaxFreeEditDistance();
+            if (to.getWorld() != initialLocation.getWorld() || to.distanceSquared(initialLocation) > maxDistance * maxDistance) {
                 plugin.stopEditing(owner, true);
-                Messages.sendSuccess(owner, "Rüstungsständerbearbeitung abgebrochen.");
+                Messages.sendSuccess(owner, config.message("free-edit-cancelled"));
             } else {
                 double dx = to.getX() - lastLocation.getX();
                 double dz = to.getZ() - lastLocation.getZ();
                 double dtotal = (dx + dz) * 0.5;
                 if (dtotal != 0) {
-                    editRotation(freeRotationAxis, dtotal);
+                    applyRotationDelta(freeRotationAxis, dtotal);
                     lastLocation = to.clone();
                 }
             }
         }
     }
 
-    public EditState getEditState() {
-        return editState;
-    }
+    private void applyRotationDelta(int axis, double diff) {
+        NumberFormat format = NumberFormat.getNumberInstance();
+        format.setMaximumFractionDigits(5);
 
-    public ArmorStand getArmorStand() {
-        return armorStand;
-    }
+        EulerAngle angle = null;
+        if (rotationToEdit == RotatablePart.Head) {
+            angle = armorStand.getHeadPose();
+        } else if (rotationToEdit == RotatablePart.Body) {
+            angle = armorStand.getBodyPose();
+        } else if (rotationToEdit == RotatablePart.LeftArm) {
+            angle = armorStand.getLeftArmPose();
+        } else if (rotationToEdit == RotatablePart.RightArm) {
+            angle = armorStand.getRightArmPose();
+        } else if (rotationToEdit == RotatablePart.LeftLeg) {
+            angle = armorStand.getLeftLegPose();
+        } else if (rotationToEdit == RotatablePart.RightLeg) {
+            angle = armorStand.getRightLegPose();
+        } else if (rotationToEdit == RotatablePart.Size) {
+            if (axis == 0) {
+                AttributeInstance scaleAttribute = armorStand.getAttribute(Attribute.SCALE);
+                double value = Double.isFinite(diff) ? scaleAttribute.getBaseValue() + diff : 1.0;
+                if (value < 1f / 16f) {
+                    value = 1f / 16f;
+                }
+                double max = owner.hasPermission("ArmorStandTools.unlimitedsize") ? config.getUnlimitedSizeLimit() : config.getDefaultSizeLimit();
+                if (value > max) {
+                    value = max;
+                }
+                scaleAttribute.setBaseValue(value);
+                if (editState != EditState.RotationWithoutWindow) {
+                    Messages.send(owner, config.message("format-scale-chat", Map.of("value", format.format(value))));
+                }
+            }
+        } else if (rotationToEdit == RotatablePart.Position) {
+            Location location = armorStand.getLocation();
+            if (axis == 0 && Double.isFinite(diff)) {
+                location.setX(location.getX() + diff);
+                if (editState != EditState.RotationWithoutWindow) {
+                    Messages.send(owner, config.message("format-axis", Map.of("axis", "X", "value", format.format(location.getX()), "unit", "")));
+                }
+            } else if (axis == 1 && Double.isFinite(diff)) {
+                location.setY(Math.max(Math.min(location.getY() + diff, location.getWorld().getMaxHeight()), location.getWorld().getMinHeight()));
+                if (editState != EditState.RotationWithoutWindow) {
+                    Messages.send(owner, config.message("format-axis", Map.of("axis", "Y", "value", format.format(location.getY()), "unit", "")));
+                }
+            } else if (axis == 2 && Double.isFinite(diff)) {
+                location.setZ(location.getZ() + diff);
+                if (editState != EditState.RotationWithoutWindow) {
+                    Messages.send(owner, config.message("format-axis", Map.of("axis", "Z", "value", format.format(location.getZ()), "unit", "")));
+                }
+            } else if (axis == 3) {
+                location.setYaw(Double.isFinite(diff) ? ((float) (location.getYaw() + radToDegree(diff))) : 0.0f);
+                if (editState != EditState.RotationWithoutWindow) {
+                    Messages.send(owner, config.message("format-yaw", Map.of("label", "Yaw", "value", format.format(location.getYaw()))));
+                }
+            }
+            ArmorStandTeleportEvent event = new ArmorStandTeleportEvent(armorStand, location, owner);
+            plugin.getServer().getPluginManager().callEvent(event);
+            if (!event.isCancelled()) {
+                armorStand.teleport(location);
+                if (rotationToEdit == RotatablePart.Position && axis == 1) {
+                    armorStand.setGravity(false);
+                }
+            }
+        }
+        if (angle != null) {
+            if (axis == 0) {
+                angle = angle.setX(Double.isFinite(diff) ? (angle.getX() + diff) : 0.0f);
+                if (editState != EditState.RotationWithoutWindow) {
+                    Messages.send(owner, config.message("format-axis", Map.of("axis", "X", "value", format.format(radToDegree(angle.getX())), "unit", "°")));
+                }
+            } else if (axis == 1) {
+                angle = angle.setY(Double.isFinite(diff) ? (angle.getY() + diff) : 0.0f);
+                if (editState != EditState.RotationWithoutWindow) {
+                    Messages.send(owner, config.message("format-axis", Map.of("axis", "Y", "value", format.format(radToDegree(angle.getY())), "unit", "°")));
+                }
+            } else if (axis == 2) {
+                angle = angle.setZ(Double.isFinite(diff) ? (angle.getZ() + diff) : 0.0f);
+                if (editState != EditState.RotationWithoutWindow) {
+                    Messages.send(owner, config.message("format-axis", Map.of("axis", "Z", "value", format.format(radToDegree(angle.getZ())), "unit", "°")));
+                }
+            }
 
-    public int getFreeMoveStartTick() {
-        return freeMoveStartTick;
+            if (rotationToEdit == RotatablePart.Head) {
+                armorStand.setHeadPose(angle);
+            } else if (rotationToEdit == RotatablePart.Body) {
+                armorStand.setBodyPose(angle);
+            } else if (rotationToEdit == RotatablePart.LeftArm) {
+                armorStand.setLeftArmPose(angle);
+            } else if (rotationToEdit == RotatablePart.RightArm) {
+                armorStand.setRightArmPose(angle);
+            } else if (rotationToEdit == RotatablePart.LeftLeg) {
+                armorStand.setLeftLegPose(angle);
+            } else if (rotationToEdit == RotatablePart.RightLeg) {
+                armorStand.setRightLegPose(angle);
+            }
+        }
+
+        updateRotationInventory();
     }
 }

@@ -2,8 +2,9 @@ name: ArmorStandTools
 
 main: de.iani.ast.ArmorStandTools
 softdepend: [WorldEdit, WorldGuard]
-version: 1.0.7
+version: ${version}
 
 author: Brokkonaut
+website: https://github.com/Cubeside/ArmorStandTools
 description: ArmorStandTools
-api-version: 1.14
+api-version: 1.21

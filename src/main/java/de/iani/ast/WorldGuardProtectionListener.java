@@ -12,11 +12,11 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 
 public class WorldGuardProtectionListener implements Listener {
-    // private ArmorStandTools plugin;
-    private WorldGuardPlugin worldGuard;
+    private final ArmorStandTools plugin;
+    private final WorldGuardPlugin worldGuard;
 
     public WorldGuardProtectionListener(ArmorStandTools plugin) {
-        // this.plugin = plugin;
+        this.plugin = plugin;
         worldGuard = (WorldGuardPlugin) plugin.getServer().getPluginManager().getPlugin("WorldGuard");
     }
 
@@ -24,7 +24,7 @@ public class WorldGuardProtectionListener implements Listener {
     public void onArmorStandTeleport(ArmorStandTeleportEvent event) {
         ApplicableRegionSet set = WorldGuard.getInstance().getPlatform().getRegionContainer().createQuery().getApplicableRegions(BukkitAdapter.adapt(event.getLocation()));
         if (!canBuild(event.getPlayer(), set)) {
-            Messages.sendError(event.getPlayer(), "Keine Baurechte!");
+            Messages.sendError(event.getPlayer(), plugin.getPluginConfig().message("no-build-permission"));
             event.setCancelled(true);
         }
     }
